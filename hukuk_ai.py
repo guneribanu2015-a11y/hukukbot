@@ -53,7 +53,11 @@ def kelime_ile_kanun_ara(kelime):
             'MevzuatTertip': '5'
         }
         
-        response = requests.get(arama_url, params=params, timeout=10)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        response = requests.get(arama_url, params=params, headers=headers, timeout=30)
         
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -88,8 +92,14 @@ def kelime_ile_kanun_ara(kelime):
         
         return None
         
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Zaman aşımı: mevzuat.gov.tr yanıt vermedi. Lütfen tekrar deneyin.")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("🔌 Bağlantı hatası: mevzuat.gov.tr'ye erişilemiyor.")
+        return None
     except Exception as e:
-        st.error(f"Arama hatası: {str(e)}")
+        st.error(f"❌ Beklenmeyen hata: {str(e)}")
         return None
 
 def kanun_ara_ve_cek(kanun_numarasi):
@@ -98,11 +108,15 @@ def kanun_ara_ve_cek(kanun_numarasi):
     Örnek: kanun_ara_ve_cek("5237") → Türk Ceza Kanunu metni
     """
     try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
         # mevzuat.gov.tr arama URL'si
         arama_url = f"https://www.mevzuat.gov.tr/MevzuatMetin/1.5.{kanun_numarasi}.pdf"
         
         # PDF'i indir
-        response = requests.get(arama_url, timeout=10)
+        response = requests.get(arama_url, headers=headers, timeout=30)
         
         if response.status_code == 200 and 'application/pdf' in response.headers.get('Content-Type', ''):
             # PDF içeriğini geçici dosyaya kaydet
@@ -122,7 +136,7 @@ def kanun_ara_ve_cek(kanun_numarasi):
         else:
             # PDF bulunamadı, HTML sayfasını dene
             html_url = f"https://www.mevzuat.gov.tr/mevzuat?MevzuatNo={kanun_numarasi}&MevzuatTur=1&MevzuatTertip=5"
-            response = requests.get(html_url, timeout=10)
+            response = requests.get(html_url, headers=headers, timeout=30)
             
             if response.status_code == 200:
                 soup = BeautifulSoup(response.content, 'html.parser')
@@ -140,8 +154,14 @@ def kanun_ara_ve_cek(kanun_numarasi):
             
             return None
             
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Zaman aşımı: Kanun metni çekilemedi. Lütfen tekrar deneyin.")
+        return None
+    except requests.exceptions.ConnectionError:
+        st.error("🔌 Bağlantı hatası: mevzuat.gov.tr'ye erişilemiyor.")
+        return None
     except Exception as e:
-        st.error(f"Kanun çekilirken hata: {str(e)}")
+        st.error(f"❌ Beklenmeyen hata: {str(e)}")
         return None
 
 def metin_analiz_et(metin):
