@@ -1,9 +1,6 @@
 import streamlit as st
 import openai
 from PyPDF2 import PdfReader
-import requests
-from bs4 import BeautifulSoup
-import re
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
@@ -37,74 +34,6 @@ def pdf_metin_cek(dosya):
         if page.extract_text()
     ])
     return metin
-
-def kelime_ile_kanun_ara(kelime):
-    """
-    mevzuat.gov.tr'de kelime ile arama yapar ve sonuçları listeler.
-    Link döner, metin çekmez.
-    """
-    try:
-        arama_url = "https://www.mevzuat.gov.tr/MevzuatFihrist"
-        
-        params = {
-            'Kelime': kelime,
-            'MevzuatTur': '1',
-            'MevzuatTertip': '5'
-        }
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(arama_url, params=params, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            sonuc_tablosu = soup.find('table', {'class': 'mevzuatTablo'})
-            if not sonuc_tablosu:
-                sonuc_tablosu = soup.find('table')
-            
-            if sonuc_tablosu:
-                sonuclar = []
-                satirlar = sonuc_tablosu.find_all('tr')[1:]
-                
-                for satir in satirlar[:10]:
-                    hucreler = satir.find_all('td')
-                    if len(hucreler) >= 2:
-                        link = satir.find('a', href=True)
-                        if link:
-                            href = link['href']
-                            match = re.search(r'MevzuatNo=(\d+)', href)
-                            if match:
-                                kanun_no = match.group(1)
-                                kanun_adi = hucreler[1].get_text(strip=True) if len(hucreler) > 1 else link.get_text(strip=True)
-                                
-                                # Tam URL oluştur
-                                if href.startswith('http'):
-                                    tam_url = href
-                                else:
-                                    tam_url = f"https://www.mevzuat.gov.tr{href}"
-                                
-                                sonuclar.append({
-                                    'numara': kanun_no,
-                                    'ad': kanun_adi,
-                                    'url': tam_url
-                                })
-                
-                return sonuclar if sonuclar else None
-        
-        return None
-        
-    except requests.exceptions.Timeout:
-        st.error("⏱️ Zaman aşımı: mevzuat.gov.tr yanıt vermedi.")
-        return None
-    except requests.exceptions.ConnectionError:
-        st.error("🔌 Bağlantı hatası: mevzuat.gov.tr'ye erişilemiyor.")
-        return None
-    except Exception as e:
-        st.error(f"❌ Arama hatası: {str(e)}")
-        return None
 
 def kanun_linki_olustur(kanun_numarasi):
     """
@@ -261,66 +190,30 @@ with col1:
 
     st.divider()
     
-    # 3. Kanun Linki Oluştur — YENİ (Sadece link, metin çekmez)
+    # 3. Kanun Linki Oluştur — Sadece Numara
     st.markdown("**3. Kanun Metni Linki** *(isteğe bağlı)*")
-    st.caption("Dilekçede referans verilebilmesi için kanun linkini oluşturur.")
+    st.caption("Kanun numarasından mevzuat.gov.tr linki oluşturur.")
     
-    arama_tipi = st.radio(
-        "Arama tipi:",
-        ["Kelime ile ara", "Numara ile ara"],
-        horizontal=True,
-        key="arama_tipi"
+    kanun_numarasi_input = st.text_input(
+        "Kanun numarasını girin (örn: 5237, 6098, 4721)",
+        key="kanun_no_input",
+        placeholder="5237"
     )
     
-    if arama_tipi == "Kelime ile ara":
-        kelime_input = st.text_input(
-            "Kelime girin (örn: tazminat, velayet, kamulaştırma)",
-            key="kelime_ara",
-            placeholder="tazminat"
-        )
-        
-        if st.button("🔍 Kanun Ara", use_container_width=True):
-            if kelime_input.strip():
-                with st.spinner(f"🔍 '{kelime_input}' aranıyor..."):
-                    sonuclar = kelime_ile_kanun_ara(kelime_input.strip())
-                
-                if sonuclar:
-                    st.session_state['arama_sonuclari'] = sonuclar
-                    st.success(f"✅ {len(sonuclar)} kanun bulundu")
-                else:
-                    st.warning(f"'{kelime_input}' için sonuç bulunamadı")
-                    st.session_state['arama_sonuclari'] = []
-            else:
-                st.warning("Lütfen arama kelimesi girin")
-        
-        # Arama sonuçlarını göster
-        if st.session_state.get('arama_sonuclari'):
-            st.markdown("**Sonuçlar:**")
-            for k in st.session_state['arama_sonuclari']:
-                with st.expander(f"📜 {k['numara']} - {k['ad'][:80]}..."):
-                    st.markdown(f"**Link:** [{k['ad']}]({k['url']})")
-                    st.caption(f"Kanun No: {k['numara']}")
-    
-    else:  # Numara ile ara
-        kanun_numarasi_input = st.text_input(
-            "Kanun numarasını girin (örn: 5237, 6098)",
-            key="kanun_no_input",
-            placeholder="5237"
-        )
-        
-        if st.button("🔗 Kanun Linkini Oluştur", use_container_width=True):
-            if kanun_numarasi_input.strip():
-                kanun_url = kanun_linki_olustur(kanun_numarasi_input.strip())
-                st.session_state['kanun_url'] = kanun_url
-                st.session_state['kanun_no_link'] = kanun_numarasi_input.strip()
-                st.success(f"✅ Link oluşturuldu")
-            else:
-                st.warning("Lütfen kanun numarası girin")
+    if st.button("🔗 Kanun Linkini Oluştur", use_container_width=True):
+        if kanun_numarasi_input.strip():
+            kanun_url = kanun_linki_olustur(kanun_numarasi_input.strip())
+            st.session_state['kanun_url'] = kanun_url
+            st.session_state['kanun_no_link'] = kanun_numarasi_input.strip()
+            st.success(f"✅ Link oluşturuldu")
+        else:
+            st.warning("Lütfen kanun numarası girin")
     
     # Oluşturulan linki göster
     if st.session_state.get('kanun_url'):
         st.info(f"📜 {st.session_state.get('kanun_no_link', '?')} sayılı kanun")
         st.markdown(f"**[Kanunu Mevzuat.gov.tr'de Aç]({st.session_state['kanun_url']})**")
+        st.caption("💡 İpucu: Sık kullanılan kanunlar - 5237 (TCK), 6098 (TBK), 4721 (TMK), 6100 (HMK)")
 
     st.divider()
 
