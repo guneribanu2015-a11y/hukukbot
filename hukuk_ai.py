@@ -147,7 +147,7 @@ with col1:
     st.subheader("📁 Dosya İşlemleri")
 
     # 1. Dava Dosyası
-    st.markdown("**1. Analiz edilecek dava dosyası**")
+    st.markdown("**1. Analiz edilecek dosya**")
     yuklenen_dosya = st.file_uploader(
         "Dava dosyasını yükleyin", 
         type="pdf", 
@@ -162,6 +162,14 @@ with col1:
             st.session_state['ham_metin'] = ham_metin
         else:
             st.warning("⚠️ PDF'den metin çıkarılamadı.")
+    
+    # Analiz butonu dosya yüklendikten hemen sonra
+    if st.session_state.get('ham_metin'):
+        if st.button("🚀 1. Analizi Başlat", use_container_width=True):
+            with st.spinner("🤖 Analiz yapılıyor..."):
+                sonuc = metin_analiz_et(st.session_state['ham_metin'])
+            st.session_state['analiz_sonucu'] = sonuc
+            st.rerun()
 
     st.divider()
 
@@ -216,14 +224,6 @@ with col1:
         st.caption("💡 İpucu: Sık kullanılan kanunlar - 5237 (TCK), 6098 (TBK), 4721 (TMK), 6100 (HMK)")
 
     st.divider()
-
-    # Analiz Butonu
-    if st.session_state.get('ham_metin'):
-        if st.button("🚀 1. Analizi Başlat", use_container_width=True):
-            with st.spinner("🤖 Analiz yapılıyor..."):
-                sonuc = metin_analiz_et(st.session_state['ham_metin'])
-            st.session_state['analiz_sonucu'] = sonuc
-            st.rerun()
 
 # ── SAĞ PANEL ────────────────────────────────────────────────
 with col2:
