@@ -36,10 +36,114 @@ def pdf_metin_cek(dosya):
     return metin
 
 def kanun_linki_olustur(kanun_numarasi):
-    """
-    Kanun numarasından direkt link oluşturur - metin çekmez
-    """
+    """Kanun numarasından direkt link oluşturur."""
     return f"https://www.mevzuat.gov.tr/mevzuat?MevzuatNo={kanun_numarasi}&MevzuatTur=1&MevzuatTertip=5"
+
+# --- POPÜLER KANUNLAR VERİTABANI ---
+KANUN_VERITABANI = {
+    # Ceza
+    "türk ceza kanunu": ("5237", "Türk Ceza Kanunu"),
+    "tck": ("5237", "Türk Ceza Kanunu"),
+    "ceza muhakemesi": ("5271", "Ceza Muhakemesi Kanunu"),
+    "cmk": ("5271", "Ceza Muhakemesi Kanunu"),
+    "infaz": ("5275", "Ceza ve Güvenlik Tedbirlerinin İnfazı Hakkında Kanun"),
+    
+    # Medeni / Borçlar
+    "türk medeni kanunu": ("4721", "Türk Medeni Kanunu"),
+    "tmk": ("4721", "Türk Medeni Kanunu"),
+    "medeni kanun": ("4721", "Türk Medeni Kanunu"),
+    "türk borçlar kanunu": ("6098", "Türk Borçlar Kanunu"),
+    "tbk": ("6098", "Türk Borçlar Kanunu"),
+    "borçlar kanunu": ("6098", "Türk Borçlar Kanunu"),
+    
+    # Usul
+    "hukuk muhakemeleri kanunu": ("6100", "Hukuk Muhakemeleri Kanunu"),
+    "hmk": ("6100", "Hukuk Muhakemeleri Kanunu"),
+    "icra ve iflas": ("2004", "İcra ve İflas Kanunu"),
+    "iik": ("2004", "İcra ve İflas Kanunu"),
+    "icra kanunu": ("2004", "İcra ve İflas Kanunu"),
+    
+    # İş / Sosyal
+    "iş kanunu": ("4857", "İş Kanunu"),
+    "işkanunu": ("4857", "İş Kanunu"),
+    "sendikalar": ("6356", "Sendikalar ve Toplu İş Sözleşmesi Kanunu"),
+    "sosyal sigortalar": ("5510", "Sosyal Sigortalar ve Genel Sağlık Sigortası Kanunu"),
+    "ssgss": ("5510", "Sosyal Sigortalar ve Genel Sağlık Sigortası Kanunu"),
+    
+    # Ticaret / Vergi
+    "türk ticaret kanunu": ("6102", "Türk Ticaret Kanunu"),
+    "ttk": ("6102", "Türk Ticaret Kanunu"),
+    "ticaret kanunu": ("6102", "Türk Ticaret Kanunu"),
+    "gelir vergisi": ("193", "Gelir Vergisi Kanunu"),
+    "katma değer vergisi": ("3065", "Katma Değer Vergisi Kanunu"),
+    "kdv": ("3065", "Katma Değer Vergisi Kanunu"),
+    "vergi usul": ("213", "Vergi Usul Kanunu"),
+    "vuk": ("213", "Vergi Usul Kanunu"),
+    
+    # Anayasa / İdare
+    "anayasa": ("2709", "Türkiye Cumhuriyeti Anayasası"),
+    "idari yargılama": ("2577", "İdari Yargılama Usulü Kanunu"),
+    "iyuk": ("2577", "İdari Yargılama Usulü Kanunu"),
+    "kamulaştırma": ("2942", "Kamulaştırma Kanunu"),
+    
+    # Tüketici / Kişisel Veri
+    "tüketicinin korunması": ("6502", "Tüketicinin Korunması Hakkında Kanun"),
+    "tkhk": ("6502", "Tüketicinin Korunması Hakkında Kanun"),
+    "kişisel verilerin korunması": ("6698", "Kişisel Verilerin Korunması Kanunu"),
+    "kvkk": ("6698", "Kişisel Verilerin Korunması Kanunu"),
+    
+    # Aile / Miras
+    "aile": ("4721", "Türk Medeni Kanunu"),
+    "miras": ("4721", "Türk Medeni Kanunu"),
+    "velayet": ("4721", "Türk Medeni Kanunu"),
+}
+
+def kanun_ara_isimden(giris, api_key):
+    """
+    Önce hardcode listede ara, bulamazsa OpenAI ile tahmin et.
+    Döner: (kanun_no, kanun_adi, kaynak) veya None
+    """
+    temiz = giris.strip().lower()
+    
+    # 1. Doğrudan numara mı?
+    if temiz.isdigit():
+        return (temiz, f"{temiz} Sayılı Kanun", "numara")
+    
+    # 2. Hardcode listede ara (kısmi eşleşme)
+    for anahtar, (no, ad) in KANUN_VERITABANI.items():
+        if anahtar in temiz or temiz in anahtar:
+            return (no, ad, "liste")
+    
+    # 3. OpenAI ile tahmin
+    try:
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": f"""Türk hukukunda '{giris}' ile ilgili en uygun kanunun numarasını ve tam adını söyle.
+SADECE şu formatta yanıt ver, başka hiçbir şey yazma:
+NUMARA: [kanun numarası]
+AD: [kanun tam adı]
+
+Eğer emin değilsen veya böyle bir kanun yoksa:
+NUMARA: YOK
+AD: YOK"""
+            }],
+            temperature=0,
+            max_tokens=100
+        )
+        yanit = response.choices[0].message.content.strip()
+        satirlar = {s.split(":")[0].strip(): s.split(":", 1)[1].strip() 
+                   for s in yanit.split("\n") if ":" in s}
+        no = satirlar.get("NUMARA", "YOK")
+        ad = satirlar.get("AD", "YOK")
+        if no != "YOK" and no.strip():
+            return (no, ad, "ai")
+    except Exception:
+        pass
+    
+    return None
 
 def metin_analiz_et(metin):
     """Dava dosyasını analiz eder."""
@@ -147,7 +251,7 @@ with col1:
     st.subheader("📁 Dosya İşlemleri")
 
     # 1. Dava Dosyası
-    st.markdown("**1. Analiz edilecek dosya**")
+    st.markdown("**1. Analiz edilecek dava dosyası**")
     yuklenen_dosya = st.file_uploader(
         "Dava dosyasını yükleyin", 
         type="pdf", 
@@ -162,14 +266,6 @@ with col1:
             st.session_state['ham_metin'] = ham_metin
         else:
             st.warning("⚠️ PDF'den metin çıkarılamadı.")
-    
-    # Analiz butonu dosya yüklendikten hemen sonra
-    if st.session_state.get('ham_metin'):
-        if st.button("🚀 1. Analizi Başlat", use_container_width=True):
-            with st.spinner("🤖 Analiz yapılıyor..."):
-                sonuc = metin_analiz_et(st.session_state['ham_metin'])
-            st.session_state['analiz_sonucu'] = sonuc
-            st.rerun()
 
     st.divider()
 
@@ -198,32 +294,52 @@ with col1:
 
     st.divider()
     
-    # 3. Kanun Linki Oluştur — Sadece Numara
+    # 3. Kanun Linki Oluştur — İsim veya Numara
     st.markdown("**3. Kanun Metni Linki** *(isteğe bağlı)*")
-    st.caption("Kanun numarasından mevzuat.gov.tr linki oluşturur.")
+    st.caption("Kanun adı **veya** numarasıyla mevzuat.gov.tr linki oluşturur.")
     
-    kanun_numarasi_input = st.text_input(
-        "Kanun numarasını girin (örn: 5237, 6098, 4721)",
-        key="kanun_no_input",
-        placeholder="5237"
+    kanun_giris = st.text_input(
+        "Kanun adı veya numarasını girin",
+        key="kanun_giris_input",
+        placeholder="örn: iş kanunu, TCK, 6098, borçlar..."
     )
     
     if st.button("🔗 Kanun Linkini Oluştur", use_container_width=True):
-        if kanun_numarasi_input.strip():
-            kanun_url = kanun_linki_olustur(kanun_numarasi_input.strip())
-            st.session_state['kanun_url'] = kanun_url
-            st.session_state['kanun_no_link'] = kanun_numarasi_input.strip()
-            st.success(f"✅ Link oluşturuldu")
+        if kanun_giris.strip():
+            with st.spinner("Kanun aranıyor..."):
+                sonuc = kanun_ara_isimden(kanun_giris.strip(), api_key)
+            if sonuc:
+                no, ad, kaynak = sonuc
+                kanun_url = kanun_linki_olustur(no)
+                st.session_state['kanun_url'] = kanun_url
+                st.session_state['kanun_no_link'] = no
+                st.session_state['kanun_ad_link'] = ad
+                st.session_state['kanun_kaynak'] = kaynak
+            else:
+                st.error("❌ Kanun bulunamadı. Lütfen kanun numarasını doğrudan girin.")
+                st.session_state['kanun_url'] = ''
         else:
-            st.warning("Lütfen kanun numarası girin")
+            st.warning("Lütfen kanun adı veya numarası girin")
     
     # Oluşturulan linki göster
     if st.session_state.get('kanun_url'):
-        st.info(f"📜 {st.session_state.get('kanun_no_link', '?')} sayılı kanun")
-        st.markdown(f"**[Kanunu Mevzuat.gov.tr'de Aç]({st.session_state['kanun_url']})**")
-        st.caption("💡 İpucu: Sık kullanılan kanunlar - 5237 (TCK), 6098 (TBK), 4721 (TMK), 6100 (HMK)")
+        kaynak = st.session_state.get('kanun_kaynak', '')
+        kaynak_etiketi = {"numara": "🔢 Numara ile", "liste": "📋 Listeden", "ai": "🤖 AI ile bulundu"}.get(kaynak, "")
+        st.info(f"📜 **{st.session_state.get('kanun_ad_link', '?')}** ({st.session_state.get('kanun_no_link', '?')} Sayılı Kanun)  \n{kaynak_etiketi}")
+        st.markdown(f"**[Kanunu Mevzuat.gov.tr'de Aç ↗]({st.session_state['kanun_url']})**")
+    
+    with st.expander("💡 Örnek aramalar"):
+        st.caption("TCK · iş kanunu · borçlar kanunu · TMK · HMK · KVKK · icra kanunu · ticaret kanunu")
 
     st.divider()
+
+    # Analiz Butonu
+    if st.session_state.get('ham_metin'):
+        if st.button("🚀 1. Analizi Başlat", use_container_width=True):
+            with st.spinner("🤖 Analiz yapılıyor..."):
+                sonuc = metin_analiz_et(st.session_state['ham_metin'])
+            st.session_state['analiz_sonucu'] = sonuc
+            st.rerun()
 
 # ── SAĞ PANEL ────────────────────────────────────────────────
 with col2:
