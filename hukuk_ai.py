@@ -1,6 +1,7 @@
 import streamlit as st
 import openai
 from PyPDF2 import PdfReader
+import streamlit.components.v1 as components
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
@@ -8,6 +9,17 @@ st.set_page_config(
     page_icon="⚖️", 
     layout="wide"
 )
+
+# --- GOOGLE ANALYTİCS ---
+components.html("""
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LJ0PN6PSD1"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-LJ0PN6PSD1');
+</script>
+""", height=0)
 
 # --- BAŞLIK VE AÇIKLAMA ---
 st.title("⚖️ HukukBot v2.5")
